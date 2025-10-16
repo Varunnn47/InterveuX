@@ -1,0 +1,36 @@
+# Environment files
+*.env
+.env*
+
+# Node modules
+node_modules/
+
+# Build outputs
+dist/
+build/
+
+# Logs
+*.log
+npm-debug.log*
+
+# Runtime data
+pids
+*.pid
+*.seed
+
+# Coverage directory used by tools like istanbul
+coverage/
+
+# Uploads
+uploads/*
+!uploads/.gitkeep
+
+# Documentation and local files
+docs/
+*.md
+*.bat
+test-*.js
+
+# OS generated files
+.DS_Store
+Thumbs.db

@@ -1,0 +1,212 @@
+.resume-results {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  padding: 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.results-container {
+  background: white;
+  border-radius: 20px;
+  padding: 3rem;
+  max-width: 800px;
+  width: 100%;
+  box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+}
+
+.results-container h2 {
+  text-align: center;
+  color: #333;
+  margin-bottom: 2rem;
+  font-size: 2.5rem;
+}
+
+.analysis-summary {
+  margin-bottom: 3rem;
+}
+
+.score-section {
+  text-align: center;
+  margin-bottom: 2rem;
+}
+
+.score-section h3 {
+  color: #4CAF50;
+  font-size: 1.8rem;
+  margin-bottom: 1rem;
+}
+
+.score-bar {
+  width: 100%;
+  height: 20px;
+  background: #f0f0f0;
+  border-radius: 10px;
+  overflow: hidden;
+  margin: 0 auto;
+  max-width: 400px;
+}
+
+.score-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #4CAF50, #45a049);
+  transition: width 0.8s ease;
+}
+
+.skills-section, .role-section {
+  margin-bottom: 2rem;
+}
+
+.skills-section h4, .role-section h4 {
+  color: #333;
+  margin-bottom: 1rem;
+  font-size: 1.3rem;
+}
+
+.skills-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.skill-tag {
+  background: #e3f2fd;
+  color: #1976d2;
+  padding: 0.5rem 1rem;
+  border-radius: 20px;
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.role-section ul {
+  list-style: none;
+  padding: 0;
+}
+
+.role-section li {
+  background: #f8f9fa;
+  padding: 0.8rem;
+  margin-bottom: 0.5rem;
+  border-radius: 8px;
+  border-left: 4px solid #667eea;
+}
+
+.navigation-section {
+  text-align: center;
+  margin-bottom: 2rem;
+}
+
+.navigation-section h3 {
+  color: #333;
+  margin-bottom: 1rem;
+  font-size: 1.8rem;
+}
+
+.navigation-section p {
+  color: #666;
+  margin-bottom: 2rem;
+}
+
+.nav-buttons {
+  display: flex;
+  gap: 2rem;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.nav-btn {
+  background: white;
+  border: 2px solid #ddd;
+  border-radius: 15px;
+  padding: 1.5rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  min-width: 250px;
+}
+
+.nav-btn:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+}
+
+.coding-btn {
+  border-color: #4CAF50;
+}
+
+.coding-btn:hover {
+  background: #4CAF50;
+  color: white;
+}
+
+.interview-btn {
+  border-color: #2196F3;
+}
+
+.interview-btn:hover {
+  background: #2196F3;
+  color: white;
+}
+
+.btn-content {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  text-align: left;
+}
+
+.btn-icon {
+  font-size: 2rem;
+}
+
+.btn-content h4 {
+  margin: 0 0 0.5rem 0;
+  font-size: 1.2rem;
+}
+
+.btn-content p {
+  margin: 0;
+  font-size: 0.9rem;
+  color: #666;
+}
+
+.nav-btn:hover .btn-content p {
+  color: rgba(255,255,255,0.8);
+}
+
+.additional-actions {
+  text-align: center;
+  padding-top: 2rem;
+  border-top: 1px solid #eee;
+}
+
+.secondary-btn {
+  background: transparent;
+  border: 2px solid #ddd;
+  color: #666;
+  padding: 0.8rem 2rem;
+  border-radius: 25px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.secondary-btn:hover {
+  background: #f8f9fa;
+  border-color: #999;
+}
+
+@media (max-width: 768px) {
+  .results-container {
+    padding: 2rem;
+    margin: 1rem;
+  }
+  
+  .nav-buttons {
+    flex-direction: column;
+    align-items: center;
+  }
+  
+  .nav-btn {
+    min-width: 100%;
+  }
+}
