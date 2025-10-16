@@ -5,7 +5,7 @@ import { Eye, EyeOff, Mail, Lock, Brain } from 'lucide-react'
 import { login } from '../utils/auth'
 import { fadeInUp } from '../utils/motion'
 import GoogleAuthButton from '../components/GoogleAuthButton'
-import AuthDebug from '../components/AuthDebug'
+
 
 const Login = () => {
   const [formData, setFormData] = useState({
@@ -182,7 +182,6 @@ const Login = () => {
           </div>
         </form>
       </motion.div>
-      <AuthDebug />
     </div>
   )
 }
