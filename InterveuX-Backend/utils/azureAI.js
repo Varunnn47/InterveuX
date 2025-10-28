@@ -5,32 +5,45 @@ let azureAI = null
 
 const getAzureAI = () => {
   if (!azureAI) {
+    console.log('🔧 Checking Azure AI configuration...')
+    console.log('API Key exists:', !!process.env.AZURE_OPENAI_API_KEY)
+    console.log('Endpoint exists:', !!process.env.AZURE_OPENAI_ENDPOINT)
+    console.log('Deployment name:', process.env.AZURE_OPENAI_DEPLOYMENT_NAME)
+    
     if (!process.env.AZURE_OPENAI_API_KEY) {
-      console.log('⚠️ AZURE_OPENAI_API_KEY not found, using fallback')
+      console.log('❌ AZURE_OPENAI_API_KEY not found')
       return null
     }
     if (!process.env.AZURE_OPENAI_ENDPOINT) {
-      console.log('⚠️ AZURE_OPENAI_ENDPOINT not found, using fallback')
+      console.log('❌ AZURE_OPENAI_ENDPOINT not found')
       return null
     }
     
-    console.log('Initializing Azure AI with endpoint:', process.env.AZURE_OPENAI_ENDPOINT)
+    console.log('✅ Initializing Azure AI with endpoint:', process.env.AZURE_OPENAI_ENDPOINT)
     
-    // Ensure endpoint ends with /openai/deployments/{deployment-name}
-    const endpoint = process.env.AZURE_OPENAI_ENDPOINT.endsWith('/') 
-      ? process.env.AZURE_OPENAI_ENDPOINT.slice(0, -1) 
-      : process.env.AZURE_OPENAI_ENDPOINT
-    
-    const baseURL = `${endpoint}/openai/deployments/${process.env.AZURE_OPENAI_DEPLOYMENT_NAME || 'gpt-4'}`
-    
-    azureAI = new OpenAI({
-      apiKey: process.env.AZURE_OPENAI_API_KEY,
-      baseURL: baseURL,
-      defaultQuery: { 'api-version': process.env.AZURE_OPENAI_API_VERSION || '2024-02-15-preview' },
-      defaultHeaders: {
-        'api-key': process.env.AZURE_OPENAI_API_KEY,
-      },
-    })
+    try {
+      // Ensure endpoint is properly formatted
+      const endpoint = process.env.AZURE_OPENAI_ENDPOINT.trim().endsWith('/') 
+        ? process.env.AZURE_OPENAI_ENDPOINT.trim().slice(0, -1) 
+        : process.env.AZURE_OPENAI_ENDPOINT.trim()
+      
+      const baseURL = `${endpoint}/openai/deployments/${process.env.AZURE_OPENAI_DEPLOYMENT_NAME || 'gpt-4'}`
+      console.log('🔗 Base URL:', baseURL)
+      
+      azureAI = new OpenAI({
+        apiKey: process.env.AZURE_OPENAI_API_KEY,
+        baseURL: baseURL,
+        defaultQuery: { 'api-version': process.env.AZURE_OPENAI_API_VERSION || '2024-02-15-preview' },
+        defaultHeaders: {
+          'api-key': process.env.AZURE_OPENAI_API_KEY,
+        },
+      })
+      
+      console.log('✅ Azure AI client initialized successfully')
+    } catch (error) {
+      console.error('❌ Failed to initialize Azure AI client:', error)
+      return null
+    }
   }
   return azureAI
 }
@@ -59,8 +72,8 @@ export const validateResumeContent = (resumeText, fileName) => {
   const textLower = resumeText.toLowerCase()
   const totalWords = resumeText.trim().split(/\s+/).length
   
-  // Minimum word count for a valid resume
-  if (totalWords < 50) {
+  // Minimum word count for a valid resume (more lenient)
+  if (totalWords < 20) {
     return {
       status: 'invalid',
       message: 'Resume is too short. Please upload a complete resume with detailed information.'
@@ -150,20 +163,21 @@ export const validateResumeContent = (resumeText, fileName) => {
     }
   }
   
-  // Check for required resume sections - MUST have at least 3 of these
+  // Check for required resume sections - MUST have at least 2 of these (more lenient)
   const requiredSections = [
     'education', 'experience', 'skills', 'projects', 'certifications',
-    'b.tech', 'bachelor', 'internship', 'resume'
+    'b.tech', 'bachelor', 'internship', 'resume', 'work', 'job', 'degree',
+    'university', 'college', 'qualification', 'training', 'course'
   ]
   
   const foundSections = requiredSections.filter(section => 
     textLower.includes(section)
   )
   
-  if (foundSections.length < 3) {
+  if (foundSections.length < 2) {
     return {
       status: 'invalid',
-      message: `Invalid resume format. Your resume must include at least 3 of these sections: ${requiredSections.join(', ')}. Found: ${foundSections.join(', ') || 'none'}.`
+      message: `Invalid resume format. Your resume must include at least 2 of these sections: education, experience, skills, projects. Found: ${foundSections.join(', ') || 'none'}.`
     }
   }
   
@@ -176,22 +190,23 @@ export const validateResumeContent = (resumeText, fileName) => {
     }
   }
   
-  // Check for personal information indicators
+  // Check for personal information indicators (more lenient)
   const personalIndicators = [
-    /\b(name|contact|phone|mobile|address)\b/i,
-    /\b(worked|employed|experience|years)\b/i,
-    /\b(graduated|degree|university|college|bachelor|master|b\.tech|btech)\b/i,
-    /\b(skills|proficient|experienced|technologies|programming)\b/i,
-    /\b(project|developed|created|built|designed)\b/i,
-    /\b(internship|intern|trainee|fresher|entry.level)\b/i,
-    /\b(certification|certified|course|training)\b/i
+    /\b(name|contact|phone|mobile|address|email)\b/i,
+    /\b(worked|employed|experience|years|job|career)\b/i,
+    /\b(graduated|degree|university|college|bachelor|master|b\.tech|btech|education|school)\b/i,
+    /\b(skills|proficient|experienced|technologies|programming|knowledge)\b/i,
+    /\b(project|developed|created|built|designed|work)\b/i,
+    /\b(internship|intern|trainee|fresher|entry.level|position)\b/i,
+    /\b(certification|certified|course|training|qualification)\b/i,
+    /\b(resume|cv|curriculum|profile)\b/i
   ]
 
   const personalMatches = personalIndicators.filter(pattern =>
     pattern.test(resumeText)
   ).length
 
-  if (personalMatches < 2) {
+  if (personalMatches < 1) {
     return {
       status: 'invalid',
       message: 'This does not appear to be a valid personal resume. Please upload a resume with your personal and professional information.'
@@ -296,30 +311,27 @@ export const validateResumeWithAI = async (resumeText, fileName) => {
       return { status: 'valid' }
     }
     
-    const prompt = `Analyze this document and determine if it's a REAL PERSONAL RESUME or FAKE.
+    // Only check for obvious fake content, be more lenient
+    const prompt = `Analyze this document and determine if it's a REAL PERSONAL RESUME.
 
 Document content:
-${resumeText.substring(0, 1500)}
+${resumeText.substring(0, 1000)}
 
 Filename: ${fileName}
 
-STRICT VALIDATION - Check for:
-1. Real personal information (not John Doe, Jane Smith, fake emails like test@example.com)
-2. Genuine work experience with real company names and realistic descriptions
-3. Authentic education details with real institutions
-4. Realistic skills and achievements (not claiming expertise in 50+ technologies)
-5. NOT template/sample text, placeholder content, or AI-generated generic content
-6. NOT job descriptions, company profiles, academic papers, or notes
-7. Consistent and believable career progression
-8. Real contact information (not 123-456-7890 or similar fake numbers)
+ONLY REJECT if it contains:
+1. Obvious placeholder text like "Lorem ipsum", "[Your Name]", "[Email]"
+2. Clear template language like "Sample Resume", "Template", "Example"
+3. Obviously fake names like "John Doe", "Jane Doe", "Test User"
+4. Fake contact info like "test@example.com", "123-456-7890"
+5. Job descriptions instead of personal resumes
+6. Company profiles or academic papers
 
-RED FLAGS for FAKE resumes:
-- Generic names like John Doe, Jane Smith
-- Fake emails: test@, sample@, example@, dummy@
-- Unrealistic experience claims
-- Template language or placeholder text
-- Too many skills for experience level
-- Repetitive or AI-generated content
+ACCEPT if it appears to be a genuine personal resume, even if:
+- Names seem uncommon
+- Content is brief
+- Skills seem extensive
+- Format is simple
 
 Respond with ONLY this JSON format:
 {
@@ -327,7 +339,7 @@ Respond with ONLY this JSON format:
   "reason": "specific reason if invalid"
 }
 
-Be STRICT - reject anything that seems fake, template, or unrealistic.`
+Be LENIENT - only reject obvious fakes or wrong document types.`
 
     const response = await client.chat.completions.create({
       model: process.env.AZURE_OPENAI_DEPLOYMENT_NAME || 'gpt-4',
@@ -378,52 +390,48 @@ export const analyzeResumeWithAzureAI = async (resumeText, fileName) => {
       "UI/UX Designer": ["Figma", "Adobe XD", "Sketch", "Photoshop", "User Research"]
     }
 
-    const prompt = `
-You are analyzing a UNIQUE resume. Generate a PERSONALIZED analysis based on the SPECIFIC content.
+    const prompt = `CRITICAL: You MUST analyze the ACTUAL resume content and provide UNIQUE responses for each different resume.
 
-UNIQUE IDENTIFIERS:
-- File: ${fileName}
-- Timestamp: ${timestamp}
-- Seed: ${randomSeed}
-- Content Hash: ${textHash}
+RESUME ANALYSIS REQUEST #${timestamp}-${randomSeed}
+File: ${fileName}
+Content Preview: ${textHash}
 
-IMPORTANT: Analyze the ACTUAL content below and provide SPECIFIC, UNIQUE responses based on what you find.
+You are analyzing a resume. Read the ENTIRE content below and extract REAL information:
 
-For valid resumes, analyze and return:
-{
-  "status": "valid",
-  "email": "extract actual email or generate unique one",
-  "skills": ["extract ACTUAL skills from content"],
-  "experience_level": "Entry Level|Mid Level|Senior",
-  "summary": "SPECIFIC summary based on actual content",
-  "programmingSkills": ["extract ACTUAL programming skills"],
-  "suitableJobRoles": ["roles based on ACTUAL skills found"],
-  "isProgrammingRelated": true/false,
-  "overallScore": "score between 70-95 based on content quality",
-  "atsScore": "score between 65-90",
-  "skillsMatch": "score between 75-95",
-  "strengths": ["SPECIFIC strengths from content"],
-  "weaknesses": ["SPECIFIC areas for improvement"],
-  "improvements": ["SPECIFIC recommendations"],
-  "missingSkills": ["relevant skills not found in resume"]
-}
+=== RESUME CONTENT START ===
+${resumeText}
+=== RESUME CONTENT END ===
 
-Skill-Role Mapping:
+INSTRUCTIONS:
+1. READ the actual resume text above
+2. EXTRACT the real email address from the content
+3. FIND actual skills, technologies, and programming languages mentioned
+4. DETERMINE experience level from years mentioned or job titles
+5. CREATE a summary based on the person's actual background
+6. MATCH skills to appropriate job roles using this mapping:
 ${JSON.stringify(skillRoleMap, null, 2)}
 
-ACTUAL RESUME CONTENT TO ANALYZE:
-${resumeText}
+RETURN ONLY this JSON format with ACTUAL extracted data:
+{
+  "status": "valid",
+  "email": "[EXTRACT REAL EMAIL FROM CONTENT OR 'not_found']",
+  "skills": ["[LIST ACTUAL SKILLS FOUND IN TEXT]"],
+  "experience_level": "[Entry Level/Mid Level/Senior based on content]",
+  "summary": "[WRITE SPECIFIC SUMMARY ABOUT THIS PERSON'S BACKGROUND]",
+  "programmingSkills": ["[LIST ACTUAL PROGRAMMING LANGUAGES/FRAMEWORKS FOUND]"],
+  "suitableJobRoles": ["[ROLES MATCHING THEIR ACTUAL SKILLS]"],
+  "isProgrammingRelated": [true if programming skills found, false otherwise],
+  "overallScore": [NUMBER 70-95 based on resume completeness],
+  "atsScore": [NUMBER 65-90 based on formatting and keywords],
+  "skillsMatch": [NUMBER 75-95 based on skill relevance],
+  "strengths": ["[SPECIFIC STRENGTHS FROM THEIR ACTUAL CONTENT]"],
+  "weaknesses": ["[AREAS FOR IMPROVEMENT BASED ON WHAT'S MISSING]"],
+  "improvements": ["[SPECIFIC SUGGESTIONS FOR THIS RESUME]"],
+  "missingSkills": ["[RELEVANT SKILLS NOT FOUND IN THEIR FIELD]"],
+  "projects": ["[LIST ACTUAL PROJECTS MENTIONED IN RESUME]"]
+}
 
-ANALYZE THIS SPECIFIC RESUME:
-1. Extract ACTUAL skills mentioned in the text
-2. Find REAL programming languages/frameworks if any
-3. Determine experience level from ACTUAL content
-4. Match FOUND skills to appropriate job roles
-5. Generate UNIQUE scores based on content quality
-6. Provide SPECIFIC feedback based on what's actually written
-7. Suggest missing skills relevant to their field
-
-Return ONLY valid JSON with PERSONALIZED analysis, no additional text.`
+DO NOT use generic responses. ANALYZE THE ACTUAL CONTENT ABOVE.`
 
     const response = await client.chat.completions.create({
       model: process.env.AZURE_OPENAI_DEPLOYMENT_NAME || 'gpt-4',
@@ -484,27 +492,37 @@ Return ONLY valid JSON with PERSONALIZED analysis, no additional text.`
     const programmingSkills = extractProgrammingSkills(resumeText)
     const isProgramming = containsProgrammingKeywords(resumeText)
     
-    // Generate varied scores based on content
-    const baseScore = 70 + (randomSeed % 20) // 70-89
-    const atsScore = 65 + (randomSeed % 25) // 65-89
-    const skillsScore = 75 + (randomSeed % 20) // 75-94
+    // Generate varied scores based on content quality and length
+    const contentLength = resumeText.length
+    const wordCount = resumeText.split(/\s+/).length
+    const skillCount = extractedSkills.length + programmingSkills.length
+    
+    // Base scores on actual content metrics
+    const baseScore = Math.min(95, 60 + Math.floor(contentLength / 100) + skillCount * 2)
+    const atsScore = Math.min(90, 55 + Math.floor(wordCount / 50) + (emailMatch ? 10 : 0))
+    const skillsScore = Math.min(95, 65 + skillCount * 3 + (isProgramming ? 10 : 5))
+    
+    // Extract projects from text
+    const extractedProjects = extractProjectsFromText(resumeText)
+    console.log('🎯 PROJECTS FOUND:', extractedProjects)
     
     return {
       status: 'valid',
       email: email,
       skills: extractedSkills.length > 0 ? extractedSkills : generateFallbackSkills(resumeText, isProgramming),
       experience_level: determineExperienceLevel(resumeText),
-      summary: generateUniqueSummary(resumeText, fileName, isProgramming),
+      summary: generateUniqueSummary(resumeText, fileName, isProgramming, extractedSkills),
       programmingSkills: programmingSkills,
       suitableJobRoles: generateJobRoles(extractedSkills, programmingSkills, isProgramming),
       isProgrammingRelated: isProgramming,
       overallScore: baseScore,
       atsScore: atsScore,
       skillsMatch: skillsScore,
-      strengths: generateUniqueStrengths(extractedSkills, programmingSkills, isProgramming),
-      weaknesses: generateUniqueWeaknesses(resumeText, isProgramming),
-      improvements: generateUniqueImprovements(resumeText, isProgramming),
-      missingSkills: generateMissingSkills(extractedSkills, programmingSkills, isProgramming)
+      strengths: generateUniqueStrengths(extractedSkills, programmingSkills, isProgramming, resumeText),
+      weaknesses: generateUniqueWeaknesses(resumeText, isProgramming, extractedSkills, programmingSkills),
+      improvements: generateUniqueImprovements(resumeText, isProgramming, extractedSkills, programmingSkills),
+      missingSkills: generateMissingSkills(extractedSkills, programmingSkills, isProgramming, resumeText),
+      projects: extractedProjects
     }
   }
 }
@@ -699,6 +717,9 @@ Requirements:
     return questions
   } catch (error) {
     console.error('❌ Coding question generation error:', error)
+    if (error.code === 'DeploymentNotFound') {
+      throw new Error('Azure OpenAI deployment not found. Please check your deployment name in Azure Portal.')
+    }
     throw new Error(`Failed to generate coding questions: ${error.message}`)
   }
 }
@@ -726,33 +747,79 @@ export const generateAIResponse = async (prompt) => {
 
 // Fallback functions for when Azure AI is not available
 const extractSkillsFromText = (text) => {
-  const skillKeywords = [
-    'JavaScript', 'Python', 'Java', 'React', 'Node.js', 'HTML', 'CSS', 'MongoDB', 'SQL',
-    'AWS', 'Docker', 'Git', 'TypeScript', 'Vue.js', 'Angular', 'Express', 'Django',
-    'Communication', 'Leadership', 'Problem Solving', 'Team Work', 'Project Management',
-    'Microsoft Office', 'Excel', 'PowerPoint', 'Word', 'Outlook', 'Photoshop',
-    'Marketing', 'Sales', 'Customer Service', 'Data Analysis', 'Research', 'Flutter',
-    'Kotlin', 'Swift', 'C++', 'C#', 'PHP', 'Ruby', 'Go', 'Rust', 'Scala', 'R',
-    'Machine Learning', 'AI', 'Data Science', 'Cloud Computing', 'DevOps', 'Agile',
-    'Scrum', 'Jira', 'Confluence', 'Slack', 'Figma', 'Adobe', 'Canva'
-  ]
-  
-  const foundSkills = skillKeywords.filter(skill => 
-    text.toLowerCase().includes(skill.toLowerCase())
-  )
-  
-  // If no specific skills found, extract some generic ones based on content
-  if (foundSkills.length === 0) {
-    const textLower = text.toLowerCase()
-    if (textLower.includes('manage') || textLower.includes('lead')) foundSkills.push('Leadership')
-    if (textLower.includes('team') || textLower.includes('collaborate')) foundSkills.push('Team Work')
-    if (textLower.includes('communicate') || textLower.includes('present')) foundSkills.push('Communication')
-    if (textLower.includes('solve') || textLower.includes('analyze')) foundSkills.push('Problem Solving')
-    if (textLower.includes('design') || textLower.includes('creative')) foundSkills.push('Design')
-    if (textLower.includes('write') || textLower.includes('content')) foundSkills.push('Writing')
+  const skillKeywords = {
+    // Programming Languages
+    'JavaScript': ['javascript', 'js', 'node.js', 'nodejs'],
+    'Python': ['python', 'py', 'django', 'flask', 'pandas', 'numpy'],
+    'Java': ['java', 'spring', 'hibernate'],
+    'React': ['react', 'reactjs', 'react.js'],
+    'HTML': ['html', 'html5'],
+    'CSS': ['css', 'css3', 'scss', 'sass'],
+    'TypeScript': ['typescript', 'ts'],
+    'Vue.js': ['vue', 'vuejs', 'vue.js'],
+    'Angular': ['angular', 'angularjs'],
+    'C++': ['c++', 'cpp'],
+    'C#': ['c#', 'csharp'],
+    'PHP': ['php'],
+    'Ruby': ['ruby', 'rails'],
+    'Go': ['golang', 'go'],
+    'Swift': ['swift', 'ios'],
+    'Kotlin': ['kotlin', 'android'],
+    'Flutter': ['flutter', 'dart'],
+    
+    // Databases
+    'SQL': ['sql', 'mysql', 'postgresql', 'sqlite'],
+    'MongoDB': ['mongodb', 'mongo', 'nosql'],
+    'Redis': ['redis'],
+    
+    // Cloud & DevOps
+    'AWS': ['aws', 'amazon web services'],
+    'Azure': ['azure', 'microsoft azure'],
+    'Docker': ['docker', 'containerization'],
+    'Kubernetes': ['kubernetes', 'k8s'],
+    'Git': ['git', 'github', 'gitlab'],
+    
+    // Frameworks & Libraries
+    'Express': ['express', 'expressjs'],
+    'Django': ['django'],
+    'Spring': ['spring', 'spring boot'],
+    
+    // Soft Skills
+    'Communication': ['communication', 'communicate', 'present', 'presentation'],
+    'Leadership': ['leadership', 'lead', 'manage', 'management', 'supervisor'],
+    'Team Work': ['teamwork', 'team work', 'collaborate', 'collaboration'],
+    'Problem Solving': ['problem solving', 'analytical', 'analyze', 'troubleshoot'],
+    'Project Management': ['project management', 'scrum', 'agile', 'jira'],
+    
+    // Tools
+    'Microsoft Office': ['microsoft office', 'ms office', 'office'],
+    'Excel': ['excel', 'spreadsheet'],
+    'PowerPoint': ['powerpoint', 'ppt'],
+    'Photoshop': ['photoshop', 'ps'],
+    'Figma': ['figma'],
+    'Adobe': ['adobe'],
+    
+    // Other
+    'Machine Learning': ['machine learning', 'ml', 'ai', 'artificial intelligence'],
+    'Data Science': ['data science', 'data analysis', 'analytics'],
+    'Marketing': ['marketing', 'digital marketing', 'seo'],
+    'Sales': ['sales', 'business development'],
+    'Customer Service': ['customer service', 'customer support']
   }
   
-  return foundSkills
+  const textLower = text.toLowerCase()
+  const foundSkills = []
+  
+  // Check for each skill and its variations
+  Object.entries(skillKeywords).forEach(([skill, variations]) => {
+    const found = variations.some(variation => textLower.includes(variation))
+    if (found) {
+      foundSkills.push(skill)
+    }
+  })
+  
+  // Remove duplicates and return
+  return [...new Set(foundSkills)]
 }
 
 // Helper functions for unique fallback responses
@@ -776,14 +843,44 @@ const generateFallbackSkills = (text, isProgramming) => {
   return [...new Set(skills)] // Remove duplicates
 }
 
-const generateUniqueSummary = (text, fileName, isProgramming) => {
+const generateUniqueSummary = (text, fileName, isProgramming, skills = []) => {
+  const textLower = text.toLowerCase()
   const name = fileName.replace(/\.[^/.]+$/, "").replace(/[^a-zA-Z0-9\s]/g, '')
   
+  // Extract experience indicators
+  const hasExperience = textLower.includes('experience') || textLower.includes('worked') || textLower.includes('employed')
+  const isFresher = textLower.includes('fresher') || textLower.includes('graduate') || textLower.includes('entry level')
+  const hasEducation = textLower.includes('university') || textLower.includes('college') || textLower.includes('degree')
+  
+  // Extract specific domains
+  const domains = []
+  if (textLower.includes('web') || textLower.includes('frontend') || textLower.includes('backend')) domains.push('web development')
+  if (textLower.includes('mobile') || textLower.includes('android') || textLower.includes('ios')) domains.push('mobile development')
+  if (textLower.includes('data') || textLower.includes('analytics') || textLower.includes('machine learning')) domains.push('data science')
+  if (textLower.includes('design') || textLower.includes('ui') || textLower.includes('ux')) domains.push('design')
+  if (textLower.includes('marketing') || textLower.includes('sales') || textLower.includes('business')) domains.push('business')
+  
+  let summary = ''
+  
   if (isProgramming) {
-    return `Technical professional with programming expertise and software development experience.`
+    if (isFresher) {
+      summary = `Recent graduate with programming skills in ${skills.slice(0, 2).join(' and ')}`
+    } else if (hasExperience) {
+      summary = `Experienced developer with expertise in ${domains.length > 0 ? domains[0] : 'software development'}`
+    } else {
+      summary = `Technical professional with programming knowledge in ${skills.slice(0, 2).join(' and ')}`
+    }
   } else {
-    return `Professional candidate with relevant industry experience and strong skill set.`
+    if (isFresher) {
+      summary = `Recent graduate seeking opportunities in ${domains.length > 0 ? domains[0] : 'professional field'}`
+    } else if (hasExperience) {
+      summary = `Professional with experience in ${domains.length > 0 ? domains[0] : 'industry operations'}`
+    } else {
+      summary = `Skilled professional with background in ${skills.slice(0, 2).join(' and ')}`
+    }
   }
+  
+  return summary + (hasEducation ? ' with strong educational foundation.' : '.')
 }
 
 const generateJobRoles = (skills, programmingSkills, isProgramming) => {
@@ -812,81 +909,225 @@ const generateJobRoles = (skills, programmingSkills, isProgramming) => {
   }
 }
 
-const generateUniqueStrengths = (skills, programmingSkills, isProgramming) => {
+const generateUniqueStrengths = (skills, programmingSkills, isProgramming, resumeText = '') => {
   const strengths = []
+  const textLower = resumeText.toLowerCase()
   
   if (isProgramming) {
-    if (programmingSkills.length > 2) strengths.push('Diverse technical skill set')
-    if (programmingSkills.includes('React')) strengths.push('Modern frontend development experience')
-    if (programmingSkills.includes('Python')) strengths.push('Versatile programming capabilities')
-    strengths.push('Technical problem-solving abilities')
+    if (programmingSkills.length > 3) strengths.push(`Proficiency in multiple technologies: ${programmingSkills.slice(0, 3).join(', ')}`)
+    if (programmingSkills.includes('React') || programmingSkills.includes('Vue') || programmingSkills.includes('Angular')) {
+      strengths.push('Modern frontend framework expertise')
+    }
+    if (programmingSkills.includes('Node.js') || programmingSkills.includes('Python') || programmingSkills.includes('Java')) {
+      strengths.push('Strong backend development capabilities')
+    }
+    const projectCount = extractProjectsFromText(resumeText).length
+    if (projectCount > 0) {
+      strengths.push(`Practical project experience (${projectCount} projects mentioned)`)
+    }
+    if (programmingSkills.length <= 3 && programmingSkills.length > 0) {
+      strengths.push(`Focused expertise in ${programmingSkills.join(' and ')}`)
+    }
   } else {
-    if (skills.includes('Leadership')) strengths.push('Leadership and management skills')
-    if (skills.includes('Communication')) strengths.push('Strong communication abilities')
-    strengths.push('Professional experience and expertise')
+    if (skills.includes('Leadership') || textLower.includes('lead') || textLower.includes('manage')) {
+      strengths.push('Leadership and team management capabilities')
+    }
+    if (skills.includes('Communication') || textLower.includes('present') || textLower.includes('communicate')) {
+      strengths.push('Excellent communication and presentation skills')
+    }
+    if (textLower.includes('customer') || textLower.includes('client')) {
+      strengths.push('Customer relationship management experience')
+    }
+    if (skills.length > 4) {
+      strengths.push(`Diverse skill set including ${skills.slice(0, 3).join(', ')}`)
+    }
+  }
+  
+  // Add generic strengths if not enough specific ones
+  if (strengths.length < 2) {
+    strengths.push(isProgramming ? 'Problem-solving and analytical thinking' : 'Professional work ethic and adaptability')
   }
   
   return strengths.slice(0, 3)
 }
 
-const generateUniqueWeaknesses = (text, isProgramming) => {
+const generateUniqueWeaknesses = (text, isProgramming, skills = [], programmingSkills = []) => {
   const weaknesses = []
+  const textLower = text.toLowerCase()
   
   if (isProgramming) {
-    if (!text.toLowerCase().includes('project')) weaknesses.push('Limited project portfolio visibility')
-    if (!text.toLowerCase().includes('github')) weaknesses.push('Missing code repository links')
-    weaknesses.push('Could benefit from more technical certifications')
+    if (!textLower.includes('github') && !textLower.includes('portfolio') && !textLower.includes('project')) {
+      weaknesses.push('Missing portfolio or project showcase links')
+    }
+    if (programmingSkills.length < 3) {
+      weaknesses.push('Limited technology stack breadth')
+    }
+    if (!textLower.includes('test') && !textLower.includes('debug')) {
+      weaknesses.push('Could emphasize testing and debugging experience')
+    }
+    if (!textLower.includes('team') && !textLower.includes('collaborate')) {
+      weaknesses.push('Limited collaborative development experience mentioned')
+    }
   } else {
-    if (!text.toLowerCase().includes('achievement')) weaknesses.push('Limited quantifiable achievements')
-    if (!text.toLowerCase().includes('certification')) weaknesses.push('Missing industry certifications')
-    weaknesses.push('Could add more specific accomplishments')
+    if (!textLower.includes('achievement') && !textLower.includes('result') && !textLower.includes('impact')) {
+      weaknesses.push('Lacks quantifiable achievements and results')
+    }
+    if (!textLower.includes('certification') && !textLower.includes('training')) {
+      weaknesses.push('Missing professional certifications or training')
+    }
+    if (skills.length < 5) {
+      weaknesses.push('Could expand skill set for broader opportunities')
+    }
+    if (!textLower.includes('leadership') && !textLower.includes('manage')) {
+      weaknesses.push('Limited leadership or management experience')
+    }
   }
   
   return weaknesses.slice(0, 2)
 }
 
-const generateUniqueImprovements = (text, isProgramming) => {
+const generateUniqueImprovements = (text, isProgramming, skills = [], programmingSkills = []) => {
   const improvements = []
+  const textLower = text.toLowerCase()
   
   if (isProgramming) {
-    improvements.push('Add links to GitHub repositories and live projects')
-    improvements.push('Include specific technologies and frameworks used')
-    improvements.push('Quantify impact of technical contributions')
+    if (!textLower.includes('github') && !textLower.includes('portfolio')) {
+      improvements.push('Add GitHub profile and portfolio links to showcase projects')
+    }
+    if (programmingSkills.length > 0 && !textLower.includes('project')) {
+      improvements.push(`Create projects demonstrating ${programmingSkills.slice(0, 2).join(' and ')} skills`)
+    }
+    if (!textLower.includes('certification') && !textLower.includes('course')) {
+      improvements.push('Consider adding relevant technical certifications')
+    }
+    if (!textLower.includes('contribute') && !textLower.includes('open source')) {
+      improvements.push('Highlight open source contributions or collaborative work')
+    }
   } else {
-    improvements.push('Include quantifiable results and achievements')
-    improvements.push('Add relevant industry certifications')
-    improvements.push('Highlight specific accomplishments with metrics')
+    if (!textLower.includes('number') && !textLower.includes('%') && !textLower.includes('increase')) {
+      improvements.push('Add quantifiable metrics and achievements with numbers')
+    }
+    if (!textLower.includes('award') && !textLower.includes('recognition')) {
+      improvements.push('Include any awards, recognition, or notable accomplishments')
+    }
+    if (skills.length < 6) {
+      improvements.push('Expand skill section with more relevant industry skills')
+    }
+    if (!textLower.includes('volunteer') && !textLower.includes('extracurricular')) {
+      improvements.push('Consider adding volunteer work or extracurricular activities')
+    }
   }
   
   return improvements.slice(0, 3)
 }
 
-const generateMissingSkills = (skills, programmingSkills, isProgramming) => {
+const generateMissingSkills = (skills, programmingSkills, isProgramming, resumeText = '') => {
   const missing = []
+  const textLower = resumeText.toLowerCase()
   
   if (isProgramming) {
-    if (!programmingSkills.includes('Git')) missing.push('Git')
-    if (!skills.includes('AWS')) missing.push('Cloud Platforms')
-    if (!programmingSkills.includes('TypeScript')) missing.push('TypeScript')
-    missing.push('Testing Frameworks', 'CI/CD')
+    // Version control
+    if (!programmingSkills.includes('Git') && !textLower.includes('git') && !textLower.includes('version control')) {
+      missing.push('Git/Version Control')
+    }
+    
+    // Cloud platforms
+    if (!textLower.includes('aws') && !textLower.includes('azure') && !textLower.includes('cloud')) {
+      missing.push('Cloud Platforms (AWS/Azure)')
+    }
+    
+    // Testing
+    if (!textLower.includes('test') && !textLower.includes('jest') && !textLower.includes('junit')) {
+      missing.push('Testing Frameworks')
+    }
+    
+    // Database skills
+    if (!programmingSkills.includes('SQL') && !textLower.includes('database') && !textLower.includes('mongodb')) {
+      missing.push('Database Management')
+    }
+    
+    // DevOps
+    if (!textLower.includes('docker') && !textLower.includes('ci/cd') && !textLower.includes('deployment')) {
+      missing.push('DevOps/CI-CD')
+    }
+    
+    // API development
+    if (!textLower.includes('api') && !textLower.includes('rest') && !textLower.includes('graphql')) {
+      missing.push('API Development')
+    }
   } else {
-    if (!skills.includes('Project Management')) missing.push('Project Management')
-    if (!skills.includes('Data Analysis')) missing.push('Data Analysis')
-    missing.push('Digital Marketing', 'CRM Tools')
+    // Project management
+    if (!skills.includes('Project Management') && !textLower.includes('project') && !textLower.includes('manage')) {
+      missing.push('Project Management')
+    }
+    
+    // Data analysis
+    if (!textLower.includes('data') && !textLower.includes('analytics') && !textLower.includes('excel')) {
+      missing.push('Data Analysis')
+    }
+    
+    // Digital skills
+    if (!textLower.includes('digital') && !textLower.includes('social media') && !textLower.includes('marketing')) {
+      missing.push('Digital Marketing')
+    }
+    
+    // Communication tools
+    if (!textLower.includes('slack') && !textLower.includes('teams') && !textLower.includes('collaboration')) {
+      missing.push('Collaboration Tools')
+    }
+    
+    // Industry certifications
+    if (!textLower.includes('certification') && !textLower.includes('certified')) {
+      missing.push('Industry Certifications')
+    }
   }
   
   return missing.slice(0, 4)
 }
 
 const extractProgrammingSkills = (text) => {
-  const programmingKeywords = [
-    'JavaScript', 'Python', 'Java', 'React', 'Node.js', 'HTML', 'CSS', 'MongoDB', 'SQL',
-    'TypeScript', 'Vue.js', 'Angular', 'Express', 'Django', 'Flask', 'Spring', 'C++', 'C#'
-  ]
+  const programmingKeywords = {
+    'JavaScript': ['javascript', 'js'],
+    'Python': ['python', 'py'],
+    'Java': ['java'],
+    'React': ['react', 'reactjs', 'react.js'],
+    'Node.js': ['node.js', 'nodejs', 'node'],
+    'HTML': ['html', 'html5'],
+    'CSS': ['css', 'css3', 'scss', 'sass'],
+    'TypeScript': ['typescript', 'ts'],
+    'Vue.js': ['vue', 'vuejs', 'vue.js'],
+    'Angular': ['angular', 'angularjs'],
+    'Express': ['express', 'expressjs'],
+    'Django': ['django'],
+    'Flask': ['flask'],
+    'Spring': ['spring', 'spring boot'],
+    'C++': ['c++', 'cpp'],
+    'C#': ['c#', 'csharp'],
+    'PHP': ['php'],
+    'Ruby': ['ruby'],
+    'Go': ['golang', 'go'],
+    'Swift': ['swift'],
+    'Kotlin': ['kotlin'],
+    'Flutter': ['flutter'],
+    'SQL': ['sql', 'mysql', 'postgresql'],
+    'MongoDB': ['mongodb', 'mongo'],
+    'Git': ['git', 'github', 'gitlab'],
+    'Docker': ['docker'],
+    'AWS': ['aws'],
+    'Azure': ['azure']
+  }
   
-  return programmingKeywords.filter(skill => 
-    text.toLowerCase().includes(skill.toLowerCase())
-  )
+  const textLower = text.toLowerCase()
+  const foundSkills = []
+  
+  Object.entries(programmingKeywords).forEach(([skill, variations]) => {
+    const found = variations.some(variation => textLower.includes(variation))
+    if (found) {
+      foundSkills.push(skill)
+    }
+  })
+  
+  return [...new Set(foundSkills)]
 }
 
 const determineExperienceLevel = (text) => {
@@ -912,4 +1153,60 @@ const containsProgrammingKeywords = (text) => {
   return programmingKeywords.some(keyword => 
     text.toLowerCase().includes(keyword)
   )
+}
+
+const extractProjectsFromText = (text) => {
+  const projects = []
+  const lines = text.split('\n')
+  const textLower = text.toLowerCase()
+  
+  // Look for project section indicators
+  const projectSectionStart = lines.findIndex(line => 
+    /^\s*(projects?|personal projects?|academic projects?|work projects?)\s*:?\s*$/i.test(line.trim())
+  )
+  
+  if (projectSectionStart !== -1) {
+    // Extract projects from dedicated section
+    for (let i = projectSectionStart + 1; i < lines.length; i++) {
+      const line = lines[i].trim()
+      if (!line) continue
+      
+      // Stop if we hit another section
+      if (/^\s*(experience|education|skills|certifications?)\s*:?\s*$/i.test(line)) break
+      
+      // Project titles are usually bullet points or numbered
+      if (/^[•\-\*\d\.]/.test(line) || line.length > 10) {
+        const project = line.replace(/^[•\-\*\d\.\s]+/, '').trim()
+        if (project.length > 5) projects.push(project)
+      }
+    }
+  } else {
+    // Look for project keywords throughout the text
+    const projectKeywords = ['built', 'developed', 'created', 'designed', 'implemented', 'project']
+    
+    lines.forEach(line => {
+      const lineLower = line.toLowerCase()
+      if (projectKeywords.some(keyword => lineLower.includes(keyword))) {
+        // Extract potential project descriptions
+        const cleaned = line.trim().replace(/^[•\-\*\d\.\s]+/, '')
+        if (cleaned.length > 15 && cleaned.length < 150) {
+          projects.push(cleaned)
+        }
+      }
+    })
+  }
+  
+  // If no projects found, look for technology mentions that might indicate projects
+  if (projects.length === 0) {
+    const techMentions = []
+    if (textLower.includes('website')) techMentions.push('Website Development')
+    if (textLower.includes('app') || textLower.includes('application')) techMentions.push('Application Development')
+    if (textLower.includes('system')) techMentions.push('System Development')
+    if (textLower.includes('dashboard')) techMentions.push('Dashboard Creation')
+    if (textLower.includes('api')) techMentions.push('API Development')
+    
+    return techMentions.slice(0, 3)
+  }
+  
+  return projects.slice(0, 5)
 }

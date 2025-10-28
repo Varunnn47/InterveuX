@@ -53,7 +53,8 @@ export const upload = multer({
 export const analyzeResume = async (req, res) => {
   try {
     const requestId = Date.now() + '-' + Math.floor(Math.random() * 1000)
-    console.log(`📎 [${requestId}] Resume upload request received`)
+    const debugMode = process.env.RESUME_DEBUG_MODE === 'true'
+    console.log(`📎 [${requestId}] Resume upload request received (Debug: ${debugMode})`)
     
     if (!req.file) {
       console.log(`❌ [${requestId}] No file in request`)
@@ -98,27 +99,39 @@ export const analyzeResume = async (req, res) => {
     }
     
     // Enhanced resume validation with strict checks
-    console.log(`🔍 [${requestId}] Validating resume content...`)
-    const validation = validateResumeContent(resumeText, req.file.originalname)
-    console.log(`📋 [${requestId}] Validation result:`, validation)
-    
-    if (validation.status === 'invalid') {
-      console.log(`❌ [${requestId}] Resume validation failed:`, validation.message)
-      return res.status(400).json({
-        status: 'invalid',
-        message: validation.message
-      })
-    }
-    
-    // Additional AI-based validation to detect fake resumes
-    console.log(`🤖 [${requestId}] Running AI-based fake resume detection...`)
-    const aiValidation = await validateResumeWithAI(resumeText, req.file.originalname)
-    if (aiValidation.status === 'invalid') {
-      console.log(`❌ [${requestId}] AI validation failed:`, aiValidation.message)
-      return res.status(400).json({
-        status: 'invalid',
-        message: aiValidation.message
-      })
+    if (!debugMode) {
+      console.log(`🔍 [${requestId}] Validating resume content...`)
+      const validation = validateResumeContent(resumeText, req.file.originalname)
+      console.log(`📋 [${requestId}] Validation result:`, validation)
+      
+      if (validation.status === 'invalid') {
+        console.log(`❌ [${requestId}] Resume validation failed:`, validation.message)
+        console.log(`📄 [${requestId}] Resume preview:`, resumeText.substring(0, 300))
+        return res.status(400).json({
+          status: 'invalid',
+          message: validation.message,
+          requestId: requestId
+        })
+      }
+      
+      // Additional AI-based validation to detect fake resumes (more lenient now)
+      console.log(`🤖 [${requestId}] Running AI-based validation...`)
+      try {
+        const aiValidation = await validateResumeWithAI(resumeText, req.file.originalname)
+        if (aiValidation.status === 'invalid') {
+          console.log(`❌ [${requestId}] AI validation failed:`, aiValidation.message)
+          return res.status(400).json({
+            status: 'invalid',
+            message: aiValidation.message,
+            requestId: requestId
+          })
+        }
+      } catch (aiError) {
+        console.log(`⚠️ [${requestId}] AI validation error, proceeding:`, aiError.message)
+        // Continue without AI validation if it fails
+      }
+    } else {
+      console.log(`🚫 [${requestId}] Debug mode: Skipping validation`)
     }
     
     console.log(`✅ [${requestId}] Resume validation passed`)

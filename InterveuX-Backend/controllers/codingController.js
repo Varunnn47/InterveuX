@@ -27,8 +27,17 @@ export const getRandomQuestions = async (req, res) => {
       // Provide default skills if none found
       const defaultSkills = ['JavaScript', 'Python']
       console.log('⚠️ No programming skills found, using defaults:', defaultSkills)
-      const questions = await generateCodingQuestions(defaultSkills, experienceLevel)
-      return res.json(questions)
+      try {
+        const questions = await generateCodingQuestions(defaultSkills, experienceLevel)
+        return res.json(questions)
+      } catch (aiError) {
+        console.error('❌ AI question generation failed:', aiError)
+        return res.status(500).json({ 
+          message: 'Azure AI service is currently unavailable. Please try again later.',
+          error: aiError.message,
+          details: 'Check Azure OpenAI configuration'
+        })
+      }
     }
     
     console.log('🤖 Generating AI questions for:', { programmingSkills, experienceLevel })
@@ -43,7 +52,29 @@ export const getRandomQuestions = async (req, res) => {
     res.json(questions)
   } catch (error) {
     console.error('❌ Error generating coding questions:', error)
-    res.status(500).json({ message: 'Error generating personalized questions', error: error.message })
+    
+    // Provide more specific error messages
+    if (error.message.includes('Azure AI not configured')) {
+      return res.status(500).json({ 
+        message: 'Azure AI service is not properly configured',
+        error: 'Missing Azure OpenAI credentials',
+        details: 'Please check AZURE_OPENAI_API_KEY and AZURE_OPENAI_ENDPOINT'
+      })
+    }
+    
+    if (error.message.includes('Failed to generate coding questions')) {
+      return res.status(500).json({ 
+        message: 'Azure AI service is currently unavailable',
+        error: error.message,
+        details: 'The AI service may be experiencing issues. Please try again later.'
+      })
+    }
+    
+    res.status(500).json({ 
+      message: 'Error generating personalized questions', 
+      error: error.message,
+      details: 'An unexpected error occurred while processing your request'
+    })
   }
 }
 
@@ -135,12 +166,23 @@ export const saveCodingResult = async (req, res) => {
   try {
     const { question, code, language, results, score, totalTests, passedTests, aiFeedback, timeSpent } = req.body
     
+    console.log('💾 Attempting to save coding result for user:', req.user?._id)
+    console.log('📄 Request body keys:', Object.keys(req.body))
+    
     if (!question || !code) {
-      return res.status(400).json({ message: 'Question and code are required' })
+      return res.status(400).json({ 
+        success: false,
+        message: 'Question and code are required',
+        received: { hasQuestion: !!question, hasCode: !!code }
+      })
     }
 
     if (!req.user || !req.user._id) {
-      return res.status(401).json({ message: 'User not authenticated' })
+      return res.status(401).json({ 
+        success: false,
+        message: 'User not authenticated',
+        details: 'Please log in to save coding results'
+      })
     }
 
     const coding = await CodingHistory.create({
@@ -157,7 +199,8 @@ export const saveCodingResult = async (req, res) => {
       submittedAt: new Date()
     })
 
-    console.log('💾 Saved coding result with AI feedback:', { 
+    console.log('✅ Successfully saved coding result:', { 
+      id: coding._id,
       userId: req.user._id, 
       score: coding.score, 
       totalTests: coding.totalTests, 
@@ -168,14 +211,41 @@ export const saveCodingResult = async (req, res) => {
     res.status(201).json({
       success: true,
       message: 'Coding result saved successfully',
-      data: coding
+      data: {
+        id: coding._id,
+        score: coding.score,
+        totalTests: coding.totalTests,
+        passedTests: coding.passedTests,
+        submittedAt: coding.submittedAt
+      }
     })
   } catch (error) {
     console.error('❌ Error saving coding result:', error)
+    
+    // Handle specific MongoDB errors
+    if (error.name === 'ValidationError') {
+      return res.status(400).json({ 
+        success: false,
+        message: 'Invalid data provided', 
+        error: error.message,
+        details: Object.keys(error.errors || {})
+      })
+    }
+    
+    if (error.name === 'MongoError' || error.name === 'MongooseError') {
+      return res.status(500).json({ 
+        success: false,
+        message: 'Database connection error', 
+        error: 'Please try again later',
+        details: 'MongoDB connection issue'
+      })
+    }
+    
     res.status(500).json({ 
       success: false,
       message: 'Error saving coding result', 
-      error: error.message 
+      error: error.message,
+      details: 'An unexpected error occurred while saving your result'
     })
   }
 }

@@ -17,6 +17,7 @@ const resumeSchema = new mongoose.Schema({
   strengths: [String],
   weaknesses: [String],
   improvements: [String],
+  projects: [String],
   createdAt: { type: Date, default: Date.now }
 });
 

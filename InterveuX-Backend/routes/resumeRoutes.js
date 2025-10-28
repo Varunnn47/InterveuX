@@ -19,6 +19,20 @@ const handleUpload = (req, res, next) => {
   })
 }
 
+// Test endpoint to check if basic upload works
+router.post('/test-upload', protect, handleUpload, (req, res) => {
+  console.log('📋 Test upload - File received:', req.file ? req.file.originalname : 'No file')
+  res.json({
+    status: 'success',
+    message: 'File upload test successful',
+    file: req.file ? {
+      name: req.file.originalname,
+      size: req.file.size,
+      mimetype: req.file.mimetype
+    } : null
+  })
+})
+
 router.post('/analyze', protect, handleUpload, analyzeResume)
 router.get('/history', protect, getResumeHistory)
 router.get('/latest', protect, getLatestResume)
